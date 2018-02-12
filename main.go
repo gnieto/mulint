@@ -17,7 +17,7 @@ func main() {
 	// v := &mulint.PrintVisitor{}
 	p := mulint.Load()
 	pkg := p.Package("github.com/gnieto/mulint/tests")
-	v := mulint.NewVisitor(p)
+	v := mulint.NewVisitor(p, pkg)
 
 	for _, file := range pkg.Files {
 		ast.Walk(v, file)
@@ -99,7 +99,7 @@ func (a *Analyzer) Errors() []LintError {
 	return a.errors
 }
 
-func (a *Analyzer) Analyze(seq *mulint.Sequence) {
+func (a *Analyzer) Analyze(seq *mulint.MutexScope) {
 	fmt.Println("Start analyzing sequence!!")
 	for _, n := range seq.Nodes() {
 		fmt.Println("Stamentent", reflect.TypeOf(n))
@@ -111,21 +111,27 @@ func (a *Analyzer) Analyze(seq *mulint.Sequence) {
 	fmt.Println()
 }
 
-func (a *Analyzer) ContainsLock(n ast.Node, seq *mulint.Sequence) {
-	mutexSelector := seq.Selector()
-
+func (a *Analyzer) ContainsLock(n ast.Node, seq *mulint.MutexScope) {
 	switch sty := n.(type) {
 	case *ast.ExprStmt:
 		a.ContainsLock(sty.X, seq)
 	case *ast.CallExpr:
-		selector := mulint.StrExpr(mulint.SubjectForCall(n, []string{"RLock", "Lock"}))
-
-		if selector == mutexSelector {
-			origin := NewLocation(seq.Pos())
-			secondLock := NewLocation(n.Pos())
-
-			err := NewLintError(origin, secondLock)
-			a.errors = append(a.errors, err)
-		}
+		a.checkLockToSequenceMutex(seq, sty)
 	}
+}
+
+func (a *Analyzer) checkLockToSequenceMutex(seq *mulint.MutexScope, callExpr *ast.CallExpr) {
+	selector := mulint.StrExpr(mulint.SubjectForCall(callExpr, []string{"RLock", "Lock"}))
+
+	if selector == seq.Selector() {
+		a.recordError(seq.Pos(), callExpr.Pos())
+	}
+}
+
+func (a *Analyzer) recordError(origin token.Pos, secondLock token.Pos) {
+	originLoc := NewLocation(origin)
+	secondLockLoc := NewLocation(secondLock)
+
+	err := NewLintError(originLoc, secondLockLoc)
+	a.errors = append(a.errors, err)
 }

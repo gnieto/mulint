@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 	"os"
 
 	"golang.org/x/tools/go/loader"
@@ -31,47 +32,53 @@ func (pv *PrintVisitor) Visit(node ast.Node) ast.Visitor {
 	return pv
 }
 
-type Sequence struct {
+type MutexScope struct {
 	mutexSelector string
 	pos           token.Pos
 	seq           []ast.Node
+	fn            *types.Var
 }
 
-func NewSequence(mutexSelector string, pos token.Pos) *Sequence {
-	return &Sequence{
+func NewMutexScope(mutexSelector string, pos token.Pos, fn *types.Var) *MutexScope {
+	return &MutexScope{
 		mutexSelector: mutexSelector,
 		seq:           make([]ast.Node, 0),
 		pos:           pos,
+		fn:            fn,
 	}
 }
 
-func (s *Sequence) Pos() token.Pos {
+func (s *MutexScope) Pos() token.Pos {
 	return s.pos
 }
 
-func (s *Sequence) Add(node ast.Node) {
+func (s *MutexScope) Add(node ast.Node) {
 	s.seq = append(s.seq, node)
 }
 
-func (s *Sequence) Nodes() []ast.Node {
+func (s *MutexScope) Nodes() []ast.Node {
 	return s.seq
 }
 
-func (s *Sequence) Selector() string {
+func (s *MutexScope) Selector() string {
 	return s.mutexSelector
 }
 
 type Sequences struct {
-	onGoing  map[string]*Sequence
+	onGoing  map[string]*MutexScope
 	defers   map[string]bool
-	finished []*Sequence
+	finished []*MutexScope
+	prog     *loader.Program
+	pkg      *loader.PackageInfo
 }
 
-func NewSequences() *Sequences {
+func NewSequences(prog *loader.Program, pkg *loader.PackageInfo) *Sequences {
 	return &Sequences{
-		onGoing:  make(map[string]*Sequence),
+		onGoing:  make(map[string]*MutexScope),
 		defers:   make(map[string]bool),
-		finished: make([]*Sequence, 0),
+		finished: make([]*MutexScope, 0),
+		prog:     prog,
+		pkg:      pkg,
 	}
 }
 
@@ -87,8 +94,17 @@ func (s *Sequences) Track(stmt ast.Stmt) {
 	// Is start of a sequence to check?
 	if e := s.isLockCall(stmt); e != nil {
 		se := StrExpr(e)
+
 		if _, exists := s.onGoing[se]; !exists {
-			s.onGoing[se] = NewSequence(se, stmt.Pos())
+			call := CallExpr(stmt)
+			sel := SelectorExpr(call)
+			root := RootSelector(sel)
+			ty, _ := s.pkg.ObjectOf(root).(*types.Var)
+
+			if true {
+				s.onGoing[se] = NewMutexScope(se, stmt.Pos(), ty)
+			}
+
 		}
 	}
 
@@ -112,11 +128,11 @@ func (s *Sequences) EndBlock() {
 		s.finished = append(s.finished, s.onGoing[k])
 	}
 
-	s.onGoing = make(map[string]*Sequence)
+	s.onGoing = make(map[string]*MutexScope)
 	s.defers = make(map[string]bool)
 }
 
-func (s *Sequences) Sequences() []*Sequence {
+func (s *Sequences) Sequences() []*MutexScope {
 	return s.finished
 }
 
@@ -132,6 +148,21 @@ func (s *Sequences) isDeferUnlockCall(node ast.Node) ast.Expr {
 	switch sty := node.(type) {
 	case *ast.DeferStmt:
 		return s.isUnlockCall(sty.Call)
+	}
+
+	return nil
+}
+
+func CallExpr(node ast.Node) *ast.CallExpr {
+	switch sty := node.(type) {
+	case *ast.CallExpr:
+		return sty
+	case *ast.ExprStmt:
+		exp, ok := sty.X.(*ast.CallExpr)
+
+		if ok {
+			return exp
+		}
 	}
 
 	return nil
@@ -168,6 +199,17 @@ func SubjectForCall(node ast.Node, names []string) ast.Expr {
 	return nil
 }
 
+func RootSelector(sel *ast.SelectorExpr) *ast.Ident {
+	switch sty := sel.X.(type) {
+	case *ast.SelectorExpr:
+		return RootSelector(sty)
+	case *ast.Ident:
+		return sty
+	}
+
+	return nil
+}
+
 func SelectorExpr(call *ast.CallExpr) *ast.SelectorExpr {
 	switch exp := call.Fun.(type) {
 	case (*ast.SelectorExpr):
@@ -181,12 +223,14 @@ func SelectorExpr(call *ast.CallExpr) *ast.SelectorExpr {
 type Visitor struct {
 	sequences *Sequences
 	program   *loader.Program
+	pkg       *loader.PackageInfo
 }
 
-func NewVisitor(prog *loader.Program) *Visitor {
+func NewVisitor(prog *loader.Program, pkg *loader.PackageInfo) *Visitor {
 	return &Visitor{
-		sequences: NewSequences(),
+		sequences: NewSequences(prog, pkg),
 		program:   prog,
+		pkg:       pkg,
 	}
 }
 
@@ -200,7 +244,7 @@ func (v *Visitor) Visit(node ast.Node) ast.Visitor {
 	return v
 }
 
-func (v *Visitor) Sequences() []*Sequence {
+func (v *Visitor) Sequences() []*MutexScope {
 	return v.sequences.Sequences()
 }
 
