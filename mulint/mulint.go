@@ -36,7 +36,7 @@ type MutexScope struct {
 	mutexSelector string
 	pos           token.Pos
 	seq           []ast.Node
-	fn            *types.Var
+	v             *types.Var
 }
 
 func NewMutexScope(mutexSelector string, pos token.Pos, fn *types.Var) *MutexScope {
@@ -44,7 +44,7 @@ func NewMutexScope(mutexSelector string, pos token.Pos, fn *types.Var) *MutexSco
 		mutexSelector: mutexSelector,
 		seq:           make([]ast.Node, 0),
 		pos:           pos,
-		fn:            fn,
+		v:             fn,
 	}
 }
 
@@ -62,6 +62,10 @@ func (s *MutexScope) Nodes() []ast.Node {
 
 func (s *MutexScope) Selector() string {
 	return s.mutexSelector
+}
+
+func (s *MutexScope) IsSameType(v *types.Var) bool {
+	return v != nil && s.v != nil && s.v.String() == v.String()
 }
 
 type Sequences struct {
@@ -172,7 +176,11 @@ func SubjectForCall(node ast.Node, names []string) ast.Expr {
 	switch sty := node.(type) {
 	case *ast.CallExpr:
 		selector := SelectorExpr(sty)
-		fnName := selector.Sel.Name
+
+		fnName := ""
+		if selector != nil {
+			fnName = selector.Sel.Name
+		}
 
 		for _, name := range names {
 			if name == fnName {
@@ -186,7 +194,11 @@ func SubjectForCall(node ast.Node, names []string) ast.Expr {
 		}
 
 		selector := SelectorExpr(exp)
-		fnName := selector.Sel.Name
+
+		fnName := ""
+		if selector != nil {
+			fnName = selector.Sel.Name
+		}
 
 		for _, name := range names {
 			if name == fnName {

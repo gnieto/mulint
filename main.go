@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 	"os"
 	"reflect"
 
@@ -22,7 +23,7 @@ func main() {
 	for _, file := range pkg.Files {
 		ast.Walk(v, file)
 		seqs := v.Sequences()
-		analyzer := NewAnalyzer()
+		analyzer := NewAnalyzer(pkg)
 
 		for _, s := range seqs {
 			analyzer.Analyze(s)
@@ -65,8 +66,10 @@ func readfile(filename string) []string {
 	return lines
 }
 
-func NewAnalyzer() *Analyzer {
-	return &Analyzer{}
+func NewAnalyzer(pkg *loader.PackageInfo) *Analyzer {
+	return &Analyzer{
+		pkg: pkg,
+	}
 }
 
 type Location struct {
@@ -93,6 +96,7 @@ func NewLintError(origin Location, secondLock Location) LintError {
 
 type Analyzer struct {
 	errors []LintError
+	pkg    *loader.PackageInfo
 }
 
 func (a *Analyzer) Errors() []LintError {
@@ -111,21 +115,66 @@ func (a *Analyzer) Analyze(seq *mulint.MutexScope) {
 	fmt.Println()
 }
 
-func (a *Analyzer) ContainsLock(n ast.Node, seq *mulint.MutexScope) {
+func (a *Analyzer) ContainsLock(n ast.Node, seq *mulint.MutexScope) bool {
 	switch sty := n.(type) {
 	case *ast.ExprStmt:
-		a.ContainsLock(sty.X, seq)
+		return a.ContainsLock(sty.X, seq)
 	case *ast.CallExpr:
-		a.checkLockToSequenceMutex(seq, sty)
+		if a.checkLockToSequenceMutex(seq, sty) {
+			return true
+		}
+
+		if a.checkCallToFuncWhichLocksSameMutex(seq, sty) {
+			return true
+		}
+	default:
+		fmt.Println("No ContainLocks for ", reflect.TypeOf(n))
 	}
+
+	return false
 }
 
-func (a *Analyzer) checkLockToSequenceMutex(seq *mulint.MutexScope, callExpr *ast.CallExpr) {
+func (a *Analyzer) checkCallToFuncWhichLocksSameMutex(seq *mulint.MutexScope, callExpr *ast.CallExpr) bool {
+	sel := mulint.SelectorExpr(callExpr)
+	if sel == nil {
+		return false
+	}
+
+	root := mulint.RootSelector(sel)
+	if root == nil {
+		return false
+	}
+
+	ty, _ := a.pkg.ObjectOf(root).(*types.Var)
+	if seq.IsSameType(ty) {
+		// Get the file where
+
+		leaf := sel.Sel
+		fmt.Println("Type of: ", reflect.TypeOf(callExpr.Fun), leaf)
+		fn := a.pkg.ObjectOf(leaf).(*types.Func)
+		// fmt.Println("Fn: ", fn)
+		fmt.Println("Type of scope: ", reflect.TypeOf(fn.Scope()))
+
+		ast.Inspect(fn.Scope(), func(arg1 ast.Node) bool {
+			fmt.Println("Element: ", reflect.TypeOf(arg1))
+
+			return true
+		})
+	}
+
+	return false
+}
+
+func (a *Analyzer) checkLockToSequenceMutex(seq *mulint.MutexScope, callExpr *ast.CallExpr) bool {
 	selector := mulint.StrExpr(mulint.SubjectForCall(callExpr, []string{"RLock", "Lock"}))
 
 	if selector == seq.Selector() {
 		a.recordError(seq.Pos(), callExpr.Pos())
+
+		return true
 	}
+
+	return false
 }
 
 func (a *Analyzer) recordError(origin token.Pos, secondLock token.Pos) {

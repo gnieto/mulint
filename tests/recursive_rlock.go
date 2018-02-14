@@ -1,6 +1,9 @@
 package tests
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 type some struct {
 	m sync.RWMutex
@@ -14,7 +17,16 @@ func (s *some) Entry() {
 	defer s.m.RUnlock()
 
 	s.sm["lalala"] = 2
+	noneStructMethod()
 	s.recursiveRLock()
+	s.deepLock()
+}
+
+func (s *some) deepLock() {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	s.sm["lala"] = 3
 }
 
 func (s *some) recursiveRLock() {
@@ -29,4 +41,8 @@ func (s *some) EntryDoubleLock() {
 
 	s.m.Lock()
 	defer s.m.Unlock()
+}
+
+func noneStructMethod() {
+	fmt.Println("I'm not doing anything")
 }
