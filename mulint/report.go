@@ -53,7 +53,7 @@ func (r *StdOut) Report(errors []LintError) {
 		originLine := r.getLine(originLockPosition)
 
 		fmt.Printf("%s:[%d] Mutex is adquired on this line: %s\n", secondLockPosition.Filename, secondLockPosition.Line, secondLockLine)
-		fmt.Printf("\t%s:[%d] But the same mutex already acquired a lock on the following line, and this will cause a dead-lock: %s\n", originLockPosition.Filename, originLockPosition.Line, originLine)
+		fmt.Printf("\t%s:[%d] But the same mutex already acquired a lock on the following line, and this may cause a dead-lock: %s\n", originLockPosition.Filename, originLockPosition.Line, originLine)
 	}
 }
 
