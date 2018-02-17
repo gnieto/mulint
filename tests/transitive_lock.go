@@ -44,14 +44,6 @@ func (s *some) recursiveRLock() {
 	s.m.RUnlock()
 }
 
-func (s *some) EntryDoubleLock() {
-	s.m.RLock()
-	defer s.m.RUnlock()
-
-	s.m.Lock()
-	defer s.m.Unlock()
-}
-
 func noneStructMethod() {
 	fmt.Println("I'm not doing anything")
 }
