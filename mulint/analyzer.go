@@ -1,10 +1,8 @@
 package mulint
 
 import (
-	"fmt"
 	"go/ast"
 	"go/token"
-	"strings"
 
 	"github.com/GoASTScanner/gas"
 	"golang.org/x/tools/go/loader"
@@ -58,7 +56,7 @@ func (a *Analyzer) checkCallToFuncWhichLocksSameMutex(seq *MutexScope, callExpr 
 	pkg, name, err := gas.GetCallInfo(callExpr, ctx)
 
 	if err == nil {
-		fqn := FQN(strings.Trim(fmt.Sprintf("%s:%s", pkg, name), "*"))
+		fqn := FromCallInfo(pkg, name)
 
 		if a.hasTransitiveCall(fqn, seq, make(map[FQN]bool)) == true {
 			a.recordError(seq.Pos(), callExpr.Pos())
