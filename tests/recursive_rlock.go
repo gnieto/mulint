@@ -12,6 +12,8 @@ type some struct {
 	ms map[int]string
 }
 
+func lalala() {}
+
 func (s *some) Entry() {
 	s.m.RLock()
 	defer s.m.RUnlock()
@@ -22,11 +24,10 @@ func (s *some) Entry() {
 	s.deepLock()
 }
 
-func (s *some) deepLock() {
-	s.m.Lock()
-	defer s.m.Unlock()
+func (s some) test() {}
 
-	s.sm["lala"] = 3
+func (s *some) deepLock() {
+	s.recursiveRLock()
 }
 
 func (s *some) recursiveRLock() {

@@ -5,32 +5,28 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"os"
 	"reflect"
+	"strings"
 
+	"github.com/GoASTScanner/gas"
 	"github.com/gnieto/mulint/mulint"
 	"golang.org/x/tools/go/loader"
 )
 
 func main() {
-	fmt.Println("aaa")
-	// v := &mulint.PrintVisitor{}
 	p := mulint.Load()
 	pkg := p.Package("github.com/gnieto/mulint/tests")
 	v := mulint.NewVisitor(p, pkg)
 
 	for _, file := range pkg.Files {
 		ast.Walk(v, file)
-		seqs := v.Sequences()
-		analyzer := NewAnalyzer(pkg)
-
-		for _, s := range seqs {
-			analyzer.Analyze(s)
-		}
-
-		report(p, analyzer.Errors())
 	}
+
+	a := NewAnalyzer(pkg, v.Sequences(), v.Calls())
+	a.Analyze()
+
+	report(p, a.Errors())
 }
 
 func report(p *loader.Program, errors []LintError) {
@@ -66,9 +62,11 @@ func readfile(filename string) []string {
 	return lines
 }
 
-func NewAnalyzer(pkg *loader.PackageInfo) *Analyzer {
+func NewAnalyzer(pkg *loader.PackageInfo, sequences map[mulint.FQN]*mulint.Sequences, calls map[mulint.FQN][]mulint.FQN) *Analyzer {
 	return &Analyzer{
-		pkg: pkg,
+		pkg:       pkg,
+		sequences: sequences,
+		calls:     calls,
 	}
 }
 
@@ -95,86 +93,108 @@ func NewLintError(origin Location, secondLock Location) LintError {
 }
 
 type Analyzer struct {
-	errors []LintError
-	pkg    *loader.PackageInfo
+	errors    []LintError
+	pkg       *loader.PackageInfo
+	sequences map[mulint.FQN]*mulint.Sequences
+	calls     map[mulint.FQN][]mulint.FQN
 }
 
 func (a *Analyzer) Errors() []LintError {
 	return a.errors
 }
 
-func (a *Analyzer) Analyze(seq *mulint.MutexScope) {
-	fmt.Println("Start analyzing sequence!!")
-	for _, n := range seq.Nodes() {
-		fmt.Println("Stamentent", reflect.TypeOf(n))
-		a.ContainsLock(n, seq)
-	}
+func (a *Analyzer) Analyze() {
+	for _, s := range a.sequences {
+		for _, seq := range s.Sequences() {
+			fmt.Println("Start analyzing sequence!!")
+			for _, n := range seq.Nodes() {
+				fmt.Println("Stamentent", reflect.TypeOf(n))
+				a.ContainsLock(n, seq)
+			}
 
-	fmt.Println()
-	fmt.Println()
-	fmt.Println()
+			fmt.Println()
+			fmt.Println()
+			fmt.Println()
+		}
+	}
 }
 
-func (a *Analyzer) ContainsLock(n ast.Node, seq *mulint.MutexScope) bool {
+func (a *Analyzer) ContainsLock(n ast.Node, seq *mulint.MutexScope) {
 	switch sty := n.(type) {
 	case *ast.ExprStmt:
-		return a.ContainsLock(sty.X, seq)
+		a.ContainsLock(sty.X, seq)
 	case *ast.CallExpr:
-		if a.checkLockToSequenceMutex(seq, sty) {
-			return true
-		}
-
-		if a.checkCallToFuncWhichLocksSameMutex(seq, sty) {
-			return true
-		}
+		a.checkLockToSequenceMutex(seq, sty)
+		a.checkCallToFuncWhichLocksSameMutex(seq, sty)
 	default:
 		fmt.Println("No ContainLocks for ", reflect.TypeOf(n))
 	}
-
-	return false
 }
 
-func (a *Analyzer) checkCallToFuncWhichLocksSameMutex(seq *mulint.MutexScope, callExpr *ast.CallExpr) bool {
-	sel := mulint.SelectorExpr(callExpr)
-	if sel == nil {
+func (a *Analyzer) checkCallToFuncWhichLocksSameMutex(seq *mulint.MutexScope, callExpr *ast.CallExpr) {
+	ctx := &gas.Context{
+		Pkg:  a.pkg.Pkg,
+		Info: &a.pkg.Info,
+	}
+
+	pkg, name, err := gas.GetCallInfo(callExpr, ctx)
+
+	if err == nil {
+		fqn := mulint.FQN(strings.Trim(fmt.Sprintf("%s:%s", pkg, name), "*"))
+		fmt.Println("On the scope of ", seq.Selector(), " call to ", pkg, name)
+
+		if a.hasTransitiveCall(fqn, seq, make(map[mulint.FQN]bool)) == true {
+			a.recordError(seq.Pos(), callExpr.Pos())
+		}
+	}
+}
+
+func (a *Analyzer) hasAnyMutexScopeWithSameSelector(fqn mulint.FQN, seq *mulint.MutexScope) bool {
+	mutexScopes, ok := a.sequences[fqn]
+	if !ok {
 		return false
 	}
 
-	root := mulint.RootSelector(sel)
-	if root == nil {
-		return false
-	}
-
-	ty, _ := a.pkg.ObjectOf(root).(*types.Var)
-	if seq.IsSameType(ty) {
-		// Get the file where
-
-		leaf := sel.Sel
-		fmt.Println("Type of: ", reflect.TypeOf(callExpr.Fun), leaf)
-		fn := a.pkg.ObjectOf(leaf).(*types.Func)
-		// fmt.Println("Fn: ", fn)
-		fmt.Println("Type of scope: ", reflect.TypeOf(fn.Scope()))
-
-		ast.Inspect(fn.Scope(), func(arg1 ast.Node) bool {
-			fmt.Println("Element: ", reflect.TypeOf(arg1))
-
+	for _, currentMutexScope := range mutexScopes.Sequences() {
+		if currentMutexScope.IsEqual(seq) == true {
 			return true
-		})
+		}
 	}
 
 	return false
 }
 
-func (a *Analyzer) checkLockToSequenceMutex(seq *mulint.MutexScope, callExpr *ast.CallExpr) bool {
+func (a *Analyzer) hasTransitiveCall(fqn mulint.FQN, seq *mulint.MutexScope, checked map[mulint.FQN]bool) bool {
+	fmt.Println("\tHas transitive call? -> ", fqn)
+	if checked, ok := checked[fqn]; ok {
+		return checked
+	}
+
+	if hasLock := a.hasAnyMutexScopeWithSameSelector(fqn, seq); hasLock {
+		checked[fqn] = hasLock
+
+		return hasLock
+	}
+
+	calls, ok := a.calls[fqn]
+	if !ok {
+		return false
+	}
+
+	any := false
+	for _, c := range calls {
+		any = any || a.hasTransitiveCall(c, seq, checked)
+	}
+
+	return any
+}
+
+func (a *Analyzer) checkLockToSequenceMutex(seq *mulint.MutexScope, callExpr *ast.CallExpr) {
 	selector := mulint.StrExpr(mulint.SubjectForCall(callExpr, []string{"RLock", "Lock"}))
 
 	if selector == seq.Selector() {
 		a.recordError(seq.Pos(), callExpr.Pos())
-
-		return true
 	}
-
-	return false
 }
 
 func (a *Analyzer) recordError(origin token.Pos, secondLock token.Pos) {
