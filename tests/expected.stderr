@@ -1,0 +1,8 @@
+mixed_locks.go:[27] Mutex lock is adquired on this line: m.Test()
+	mixed_locks.go:[24] But the same lock was acquired here: m.m.Lock()
+simple_rlock.go:[15] Mutex lock is adquired on this line: a.m.Lock()
+	simple_rlock.go:[12] But the same lock was acquired here: a.m.RLock()
+transitive_lock.go:[23] Mutex lock is adquired on this line: s.recursiveRLock()
+	transitive_lock.go:[18] But the same lock was acquired here: s.m.RLock()
+transitive_lock.go:[24] Mutex lock is adquired on this line: s.deepLock()
+	transitive_lock.go:[18] But the same lock was acquired here: s.m.RLock()
