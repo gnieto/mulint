@@ -2,6 +2,7 @@ package main
 
 import (
 	"go/ast"
+	"os"
 
 	"github.com/gnieto/mulint/mulint"
 )
@@ -26,4 +27,8 @@ func main() {
 
 	stdout := mulint.NewStdOutReporter(p)
 	stdout.Report(errors)
+
+	if len(errors) > 0 {
+		os.Exit(1)
+	}
 }
