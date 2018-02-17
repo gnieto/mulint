@@ -112,10 +112,7 @@ func (s *Sequences) Track(stmt ast.Stmt) {
 			root := RootSelector(sel)
 			ty, _ := s.pkg.ObjectOf(root).(*types.Var)
 
-			if true {
-				s.onGoing[se] = NewMutexScope(se, stmt.Pos(), ty)
-			}
-
+			s.onGoing[se] = NewMutexScope(se, stmt.Pos(), ty)
 		}
 	}
 
@@ -130,13 +127,16 @@ func (s *Sequences) Track(stmt ast.Stmt) {
 		se := StrExpr(e)
 		if ogs, ok := s.onGoing[se]; ok {
 			s.finished = append(s.finished, ogs)
+			delete(s.onGoing, se)
 		}
 	}
 }
 
 func (s *Sequences) EndBlock() {
 	for k, _ := range s.defers {
-		s.finished = append(s.finished, s.onGoing[k])
+		if og, ok := s.onGoing[k]; ok {
+			s.finished = append(s.finished, og)
+		}
 	}
 
 	s.onGoing = make(map[string]*MutexScope)
@@ -266,6 +266,11 @@ func (v *Visitor) Visit(node ast.Node) ast.Visitor {
 	case *ast.FuncDecl:
 		body := stmt.Body
 		fqn := FQN(v.fqn(stmt))
+
+		// Protect if body is nil, which means that is a external non-go func
+		if body == nil {
+			return v
+		}
 
 		v.analyzeBody(fqn, body)
 		v.recordCalls(fqn, body)

@@ -16,17 +16,21 @@ import (
 
 func main() {
 	p := mulint.Load()
-	pkg := p.Package("github.com/gnieto/mulint/tests")
-	v := mulint.NewVisitor(p, pkg)
+	errors := make([]LintError, 0)
 
-	for _, file := range pkg.Files {
-		ast.Walk(v, file)
+	for _, pkg := range p.AllPackages {
+		v := mulint.NewVisitor(p, pkg)
+
+		for _, file := range pkg.Files {
+			ast.Walk(v, file)
+		}
+
+		a := NewAnalyzer(pkg, v.Sequences(), v.Calls())
+		a.Analyze()
+		errors = append(errors, a.Errors()...)
 	}
 
-	a := NewAnalyzer(pkg, v.Sequences(), v.Calls())
-	a.Analyze()
-
-	report(p, a.Errors())
+	report(p, errors)
 }
 
 func report(p *loader.Program, errors []LintError) {
@@ -106,7 +110,8 @@ func (a *Analyzer) Errors() []LintError {
 func (a *Analyzer) Analyze() {
 	for _, s := range a.sequences {
 		for _, seq := range s.Sequences() {
-			fmt.Println("Start analyzing sequence!!")
+			fmt.Println("Start analyzing sequence!!", seq)
+
 			for _, n := range seq.Nodes() {
 				fmt.Println("Stamentent", reflect.TypeOf(n))
 				a.ContainsLock(n, seq)
