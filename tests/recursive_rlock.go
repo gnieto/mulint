@@ -24,6 +24,14 @@ func (s *some) Entry() {
 	s.deepLock()
 }
 
+func (s *some) ShouldNotDetectDeadLock() {
+	s.m.RLock()
+	noneStructMethod()
+	s.m.Unlock()
+
+	s.deepLock()
+}
+
 func (s some) test() {}
 
 func (s *some) deepLock() {

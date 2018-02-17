@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/token"
 	"os"
+	"strings"
 
 	"golang.org/x/tools/go/loader"
 )
@@ -52,8 +53,8 @@ func (r *StdOut) Report(errors []LintError) {
 		originLockPosition := r.program.Fset.Position(e.origin.pos)
 		originLine := r.getLine(originLockPosition)
 
-		fmt.Printf("%s:[%d] Mutex is adquired on this line: %s\n", secondLockPosition.Filename, secondLockPosition.Line, secondLockLine)
-		fmt.Printf("\t%s:[%d] But the same mutex already acquired a lock on the following line, and this may cause a dead-lock: %s\n", originLockPosition.Filename, originLockPosition.Line, originLine)
+		fmt.Printf("%s:[%d] Mutex lock is adquired on this line: %s\n", r.baseFilename(secondLockPosition.Filename), secondLockPosition.Line, strings.TrimSpace(secondLockLine))
+		fmt.Printf("\t%s:[%d] But the same lock was acquired here: %s\n", r.baseFilename(originLockPosition.Filename), originLockPosition.Line, strings.TrimSpace(originLine))
 	}
 }
 
@@ -61,6 +62,16 @@ func (r *StdOut) getLine(position token.Position) string {
 	lines := r.readfile(position.Filename)
 
 	return lines[position.Line-1]
+}
+
+func (r *StdOut) baseFilename(filename string) string {
+	parts := strings.Split(filename, "/")
+
+	if len(parts) == 0 {
+		return filename
+	}
+
+	return parts[len(parts)-1]
 }
 
 func (r *StdOut) readfile(filename string) []string {
