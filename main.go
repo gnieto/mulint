@@ -17,7 +17,7 @@ func main() {
 			ast.Walk(v, file)
 		}
 
-		a := mulint.NewAnalyzer(pkg, v.Sequences(), v.Calls())
+		a := mulint.NewAnalyzer(pkg, v.Scopes(), v.Calls())
 		// TODO: Analyze should return errors, probablty. It does not make sense
 		// call Analyze and then call to Errors to retrieve them...
 		a.Analyze()

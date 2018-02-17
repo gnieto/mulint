@@ -65,7 +65,7 @@ func (s *MutexScope) IsSameType(v *types.Var) bool {
 	return v != nil && s.v != nil && s.v.String() == v.String()
 }
 
-type Sequences struct {
+type Scopes struct {
 	onGoing  map[string]*MutexScope
 	defers   map[string]bool
 	finished []*MutexScope
@@ -73,8 +73,8 @@ type Sequences struct {
 	pkg      *loader.PackageInfo
 }
 
-func NewSequences(prog *loader.Program, pkg *loader.PackageInfo) *Sequences {
-	return &Sequences{
+func NewScopes(prog *loader.Program, pkg *loader.PackageInfo) *Scopes {
+	return &Scopes{
 		onGoing:  make(map[string]*MutexScope),
 		defers:   make(map[string]bool),
 		finished: make([]*MutexScope, 0),
@@ -87,7 +87,7 @@ func StrExpr(e ast.Expr) string {
 	return fmt.Sprintf("%s", e)
 }
 
-func (s *Sequences) Track(stmt ast.Stmt) {
+func (s *Scopes) Track(stmt ast.Stmt) {
 	for _, og := range s.onGoing {
 		og.Add(stmt)
 	}
@@ -122,7 +122,7 @@ func (s *Sequences) Track(stmt ast.Stmt) {
 	}
 }
 
-func (s *Sequences) EndBlock() {
+func (s *Scopes) EndBlock() {
 	for k, _ := range s.defers {
 		if og, ok := s.onGoing[k]; ok {
 			s.finished = append(s.finished, og)
@@ -133,23 +133,23 @@ func (s *Sequences) EndBlock() {
 	s.defers = make(map[string]bool)
 }
 
-func (s *Sequences) HasAnyScope() bool {
+func (s *Scopes) HasAnyScope() bool {
 	return len(s.finished) > 0
 }
 
-func (s *Sequences) Sequences() []*MutexScope {
+func (s *Scopes) Scopes() []*MutexScope {
 	return s.finished
 }
 
-func (s *Sequences) isLockCall(node ast.Node) ast.Expr {
+func (s *Scopes) isLockCall(node ast.Node) ast.Expr {
 	return SubjectForCall(node, []string{"RLock", "Lock"})
 }
 
-func (s *Sequences) isUnlockCall(node ast.Node) ast.Expr {
+func (s *Scopes) isUnlockCall(node ast.Node) ast.Expr {
 	return SubjectForCall(node, []string{"RUnlock", "Unlock"})
 }
 
-func (s *Sequences) isDeferUnlockCall(node ast.Node) ast.Expr {
+func (s *Scopes) isDeferUnlockCall(node ast.Node) ast.Expr {
 	switch sty := node.(type) {
 	case *ast.DeferStmt:
 		return s.isUnlockCall(sty.Call)
@@ -159,18 +159,18 @@ func (s *Sequences) isDeferUnlockCall(node ast.Node) ast.Expr {
 }
 
 type Visitor struct {
-	sequences map[FQN]*Sequences
-	calls     map[FQN][]FQN
-	program   *loader.Program
-	pkg       *loader.PackageInfo
+	scopes  map[FQN]*Scopes
+	calls   map[FQN][]FQN
+	program *loader.Program
+	pkg     *loader.PackageInfo
 }
 
 func NewVisitor(prog *loader.Program, pkg *loader.PackageInfo) *Visitor {
 	return &Visitor{
-		sequences: make(map[FQN]*Sequences),
-		calls:     make(map[FQN][]FQN),
-		program:   prog,
-		pkg:       pkg,
+		scopes:  make(map[FQN]*Scopes),
+		calls:   make(map[FQN][]FQN),
+		program: prog,
+		pkg:     pkg,
 	}
 }
 
@@ -243,8 +243,8 @@ func (v *Visitor) fromExpr(e ast.Expr) *ast.Ident {
 	return nil
 }
 
-func (v *Visitor) Sequences() map[FQN]*Sequences {
-	return v.sequences
+func (v *Visitor) Scopes() map[FQN]*Scopes {
+	return v.scopes
 }
 
 func (v *Visitor) Calls() map[FQN][]FQN {
@@ -252,15 +252,15 @@ func (v *Visitor) Calls() map[FQN][]FQN {
 }
 
 func (v *Visitor) analyzeBody(fqn FQN, body *ast.BlockStmt) {
-	sequences := NewSequences(v.program, v.pkg)
+	scopes := NewScopes(v.program, v.pkg)
 
 	for _, stmt := range body.List {
-		sequences.Track(stmt)
+		scopes.Track(stmt)
 	}
 
-	sequences.EndBlock()
+	scopes.EndBlock()
 
-	if sequences.HasAnyScope() {
-		v.sequences[fqn] = sequences
+	if scopes.HasAnyScope() {
+		v.scopes[fqn] = scopes
 	}
 }

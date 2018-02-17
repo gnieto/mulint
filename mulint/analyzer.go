@@ -9,17 +9,17 @@ import (
 )
 
 type Analyzer struct {
-	errors    []LintError
-	pkg       *loader.PackageInfo
-	sequences map[FQN]*Sequences
-	calls     map[FQN][]FQN
+	errors []LintError
+	pkg    *loader.PackageInfo
+	scopes map[FQN]*Scopes
+	calls  map[FQN][]FQN
 }
 
-func NewAnalyzer(pkg *loader.PackageInfo, sequences map[FQN]*Sequences, calls map[FQN][]FQN) *Analyzer {
+func NewAnalyzer(pkg *loader.PackageInfo, scopes map[FQN]*Scopes, calls map[FQN][]FQN) *Analyzer {
 	return &Analyzer{
-		pkg:       pkg,
-		sequences: sequences,
-		calls:     calls,
+		pkg:    pkg,
+		scopes: scopes,
+		calls:  calls,
 	}
 }
 
@@ -28,8 +28,8 @@ func (a *Analyzer) Errors() []LintError {
 }
 
 func (a *Analyzer) Analyze() {
-	for _, s := range a.sequences {
-		for _, seq := range s.Sequences() {
+	for _, s := range a.scopes {
+		for _, seq := range s.Scopes() {
 			for _, n := range seq.Nodes() {
 				a.ContainsLock(n, seq)
 			}
@@ -65,12 +65,12 @@ func (a *Analyzer) checkCallToFuncWhichLocksSameMutex(seq *MutexScope, callExpr 
 }
 
 func (a *Analyzer) hasAnyMutexScopeWithSameSelector(fqn FQN, seq *MutexScope) bool {
-	mutexScopes, ok := a.sequences[fqn]
+	mutexScopes, ok := a.scopes[fqn]
 	if !ok {
 		return false
 	}
 
-	for _, currentMutexScope := range mutexScopes.Sequences() {
+	for _, currentMutexScope := range mutexScopes.Scopes() {
 		if currentMutexScope.IsEqual(seq) == true {
 			return true
 		}
