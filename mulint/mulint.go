@@ -6,7 +6,6 @@ import (
 	"go/token"
 	"go/types"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/GoASTScanner/gas"
@@ -25,14 +24,6 @@ func Load() *loader.Program {
 	prog, _ := conf.Load()
 
 	return prog
-}
-
-type PrintVisitor struct{}
-
-func (pv *PrintVisitor) Visit(node ast.Node) ast.Visitor {
-	fmt.Printf("Node %#v\n", node)
-
-	return pv
 }
 
 type MutexScope struct {
@@ -325,8 +316,6 @@ func (v *Visitor) fromExpr(e ast.Expr) *ast.Ident {
 		return exp.Sel
 	case *ast.Ident:
 		return exp
-	default:
-		fmt.Println("OTHER: ", reflect.TypeOf(exp))
 	}
 
 	return nil

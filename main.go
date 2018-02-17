@@ -6,7 +6,6 @@ import (
 	"go/ast"
 	"go/token"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/GoASTScanner/gas"
@@ -110,16 +109,9 @@ func (a *Analyzer) Errors() []LintError {
 func (a *Analyzer) Analyze() {
 	for _, s := range a.sequences {
 		for _, seq := range s.Sequences() {
-			fmt.Println("Start analyzing sequence!!", seq)
-
 			for _, n := range seq.Nodes() {
-				fmt.Println("Stamentent", reflect.TypeOf(n))
 				a.ContainsLock(n, seq)
 			}
-
-			fmt.Println()
-			fmt.Println()
-			fmt.Println()
 		}
 	}
 }
@@ -131,8 +123,6 @@ func (a *Analyzer) ContainsLock(n ast.Node, seq *mulint.MutexScope) {
 	case *ast.CallExpr:
 		a.checkLockToSequenceMutex(seq, sty)
 		a.checkCallToFuncWhichLocksSameMutex(seq, sty)
-	default:
-		fmt.Println("No ContainLocks for ", reflect.TypeOf(n))
 	}
 }
 
@@ -146,7 +136,6 @@ func (a *Analyzer) checkCallToFuncWhichLocksSameMutex(seq *mulint.MutexScope, ca
 
 	if err == nil {
 		fqn := mulint.FQN(strings.Trim(fmt.Sprintf("%s:%s", pkg, name), "*"))
-		fmt.Println("On the scope of ", seq.Selector(), " call to ", pkg, name)
 
 		if a.hasTransitiveCall(fqn, seq, make(map[mulint.FQN]bool)) == true {
 			a.recordError(seq.Pos(), callExpr.Pos())
@@ -170,7 +159,6 @@ func (a *Analyzer) hasAnyMutexScopeWithSameSelector(fqn mulint.FQN, seq *mulint.
 }
 
 func (a *Analyzer) hasTransitiveCall(fqn mulint.FQN, seq *mulint.MutexScope, checked map[mulint.FQN]bool) bool {
-	fmt.Println("\tHas transitive call? -> ", fqn)
 	if checked, ok := checked[fqn]; ok {
 		return checked
 	}
