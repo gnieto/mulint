@@ -5,19 +5,15 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"os"
 
 	"github.com/GoASTScanner/gas"
 	"golang.org/x/tools/go/loader"
 )
 
-func Load() *loader.Program {
+func Load(paths []string) *loader.Program {
 	var conf loader.Config
 
-	// Use the command-line arguments to specify
-	// a set of initial packages to load from source.
-	// See FromArgsUsage for help.
-	conf.FromArgs(os.Args[1:], false)
+	conf.FromArgs(paths, false)
 
 	// Finally, load all the packages specified by the configuration.
 	prog, _ := conf.Load()

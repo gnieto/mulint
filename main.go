@@ -1,17 +1,27 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"go/ast"
 	"os"
 
 	"github.com/gnieto/mulint/mulint"
+	"github.com/kisielk/gotool"
 )
 
 func main() {
-	p := mulint.Load()
 	errors := make([]mulint.LintError, 0)
+	flag.Parse()
+	var packages []string
 
+	for _, pkg := range gotool.ImportPaths(flag.Args()) {
+		packages = append(packages, pkg)
+	}
+
+	p := mulint.Load(packages)
 	for _, pkg := range p.AllPackages {
+		fmt.Println("PKG: ", pkg)
 		v := mulint.NewVisitor(p, pkg)
 
 		for _, file := range pkg.Files {

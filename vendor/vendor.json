@@ -9,6 +9,18 @@
 			"revisionTime": "2018-02-15T09:53:01Z"
 		},
 		{
+			"checksumSHA1": "/OoEj0wxK7Rd25jAlZv1xi+e9wg=",
+			"path": "github.com/kisielk/gotool",
+			"revision": "d6ce6262d87e3a4e153e86023ff56ae771554a41",
+			"revisionTime": "2017-08-28T04:23:10Z"
+		},
+		{
+			"checksumSHA1": "9jyCVFMF5GDl15Vqp2ZxRmmNftE=",
+			"path": "github.com/kisielk/gotool/internal/load",
+			"revision": "d6ce6262d87e3a4e153e86023ff56ae771554a41",
+			"revisionTime": "2017-08-28T04:23:10Z"
+		},
+		{
 			"checksumSHA1": "AsL/fTkY1p1HNVSikhVZJd++Nrk=",
 			"path": "golang.org/x/tools/go/ast/astutil",
 			"revision": "ce871d178848e3eea1e8795e5cfb74053dde4bb9",
