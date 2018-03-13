@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"go/ast"
 	"os"
 
@@ -21,7 +20,6 @@ func main() {
 
 	p := mulint.Load(packages)
 	for _, pkg := range p.AllPackages {
-		fmt.Println("PKG: ", pkg)
 		v := mulint.NewVisitor(p, pkg)
 
 		for _, file := range pkg.Files {
