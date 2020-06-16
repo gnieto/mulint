@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -ex
+
 current_out=$(mktemp)
 expected_out=$(mktemp)
 go run main.go ./tests | sort  > $current_out

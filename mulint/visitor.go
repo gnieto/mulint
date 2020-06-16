@@ -6,7 +6,7 @@ import (
 	"go/token"
 	"go/types"
 
-	"github.com/GoASTScanner/gas"
+	"github.com/securego/gosec"
 	"golang.org/x/tools/go/loader"
 )
 
@@ -193,12 +193,12 @@ func (v *Visitor) recordCalls(currentFQN FQN, body *ast.BlockStmt) {
 		call := CallExpr(stmt)
 
 		if call != nil {
-			ctx := gas.Context{
+			ctx := gosec.Context{
 				Pkg:  v.pkg.Pkg,
 				Info: &v.pkg.Info,
 			}
 
-			pkg, name, err := gas.GetCallInfo(call, &ctx)
+			pkg, name, err := gosec.GetCallInfo(call, &ctx)
 			if err == nil {
 				fqn := FromCallInfo(pkg, name)
 				v.addCall(currentFQN, fqn)

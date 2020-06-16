@@ -89,4 +89,4 @@ Finally, all the analysis is done per package. If there's some recursive `RLock`
 ## Attribution
 
 - I have checked the `errcheck` code (https://github.com/kisielk/errcheck) as an example of how the AST is walked on Go
-- Lint uses GoASTScanner (https://github.com/GoASTScanner/gas), just for a method that refused to re-writte myself (`GetCallInfo`)
+- Lint uses gosec (https://github.com/securego/gosec), just for a method that refused to re-writte myself (`GetCallInfo`)

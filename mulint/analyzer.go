@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 
-	"github.com/GoASTScanner/gas"
+	"github.com/securego/gosec"
 	"golang.org/x/tools/go/loader"
 )
 
@@ -48,12 +48,12 @@ func (a *Analyzer) ContainsLock(n ast.Node, seq *MutexScope) {
 }
 
 func (a *Analyzer) checkCallToFuncWhichLocksSameMutex(seq *MutexScope, callExpr *ast.CallExpr) {
-	ctx := &gas.Context{
+	ctx := &gosec.Context{
 		Pkg:  a.pkg.Pkg,
 		Info: &a.pkg.Info,
 	}
 
-	pkg, name, err := gas.GetCallInfo(callExpr, ctx)
+	pkg, name, err := gosec.GetCallInfo(callExpr, ctx)
 
 	if err == nil {
 		fqn := FromCallInfo(pkg, name)
