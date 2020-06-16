@@ -12,6 +12,6 @@ func (a *another) Test() {
 	a.m.RLock()
 	defer a.m.RUnlock()
 
-	a.m.Lock()
+	a.m.Lock() // want "Mutex lock is adquired on this line"
 	a.m.Unlock()
 }

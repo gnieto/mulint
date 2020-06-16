@@ -10,30 +10,17 @@ import (
 	"golang.org/x/tools/go/loader"
 )
 
-func Load(paths []string) *loader.Program {
-	var conf loader.Config
-
-	conf.FromArgs(paths, false)
-
-	// Finally, load all the packages specified by the configuration.
-	prog, _ := conf.Load()
-
-	return prog
-}
-
 type MutexScope struct {
 	mutexSelector string
 	pos           token.Pos
 	seq           []ast.Node
-	v             *types.Var
 }
 
-func NewMutexScope(mutexSelector string, pos token.Pos, fn *types.Var) *MutexScope {
+func NewMutexScope(mutexSelector string, pos token.Pos) *MutexScope {
 	return &MutexScope{
 		mutexSelector: mutexSelector,
 		seq:           make([]ast.Node, 0),
 		pos:           pos,
-		v:             fn,
 	}
 }
 
@@ -57,10 +44,6 @@ func (s *MutexScope) Selector() string {
 	return s.mutexSelector
 }
 
-func (s *MutexScope) IsSameType(v *types.Var) bool {
-	return v != nil && s.v != nil && s.v.String() == v.String()
-}
-
 type Scopes struct {
 	onGoing  map[string]*MutexScope
 	defers   map[string]bool
@@ -69,13 +52,12 @@ type Scopes struct {
 	pkg      *loader.PackageInfo
 }
 
-func NewScopes(prog *loader.Program, pkg *loader.PackageInfo) *Scopes {
+func NewScopes(prog *loader.Program) *Scopes {
 	return &Scopes{
 		onGoing:  make(map[string]*MutexScope),
 		defers:   make(map[string]bool),
 		finished: make([]*MutexScope, 0),
 		prog:     prog,
-		pkg:      pkg,
 	}
 }
 
@@ -93,12 +75,7 @@ func (s *Scopes) Track(stmt ast.Stmt) {
 		se := StrExpr(e)
 
 		if _, exists := s.onGoing[se]; !exists {
-			call := CallExpr(stmt)
-			sel := SelectorExpr(call)
-			root := RootSelector(sel)
-			ty, _ := s.pkg.ObjectOf(root).(*types.Var)
-
-			s.onGoing[se] = NewMutexScope(se, stmt.Pos(), ty)
+			s.onGoing[se] = NewMutexScope(se, stmt.Pos())
 		}
 	}
 
@@ -158,15 +135,17 @@ type Visitor struct {
 	scopes  map[FQN]*Scopes
 	calls   map[FQN][]FQN
 	program *loader.Program
-	pkg     *loader.PackageInfo
+	pkg     *types.Package
+	info    *types.Info
 }
 
-func NewVisitor(prog *loader.Program, pkg *loader.PackageInfo) *Visitor {
+func NewVisitor(prog *loader.Program, pkg *types.Package, info *types.Info) *Visitor {
 	return &Visitor{
 		scopes:  make(map[FQN]*Scopes),
 		calls:   make(map[FQN][]FQN),
 		program: prog,
 		pkg:     pkg,
+		info:    info,
 	}
 }
 
@@ -194,8 +173,8 @@ func (v *Visitor) recordCalls(currentFQN FQN, body *ast.BlockStmt) {
 
 		if call != nil {
 			ctx := gosec.Context{
-				Pkg:  v.pkg.Pkg,
-				Info: &v.pkg.Info,
+				Pkg:  v.pkg,
+				Info: v.info,
 			}
 
 			pkg, name, err := gosec.GetCallInfo(call, &ctx)
@@ -220,16 +199,16 @@ func (v *Visitor) fqn(r *ast.FuncDecl) string {
 	name := r.Name.String()
 	if r.Recv != nil {
 		recv := r.Recv.List[0].Type
-		name = fmt.Sprintf("%s:%s", v.fromExpr(recv), name)
+		name = fmt.Sprintf("%s:%s", v.extractFileAndFnName(recv), name)
 	}
 
-	return v.pkg.String() + "." + name
+	return v.pkg.Path() + "." + name
 }
 
-func (v *Visitor) fromExpr(e ast.Expr) *ast.Ident {
+func (v *Visitor) extractFileAndFnName(e ast.Expr) *ast.Ident {
 	switch exp := e.(type) {
 	case *ast.StarExpr:
-		return v.fromExpr(exp.X)
+		return v.extractFileAndFnName(exp.X)
 	case *ast.SelectorExpr:
 		return exp.Sel
 	case *ast.Ident:
@@ -248,9 +227,10 @@ func (v *Visitor) Calls() map[FQN][]FQN {
 }
 
 func (v *Visitor) analyzeBody(fqn FQN, body *ast.BlockStmt) {
-	scopes := NewScopes(v.program, v.pkg)
+	scopes := NewScopes(v.program)
 
 	for _, stmt := range body.List {
+
 		scopes.Track(stmt)
 	}
 
