@@ -20,8 +20,8 @@ func (s *some) Entry() {
 
 	s.sm["lalala"] = 2
 	noneStructMethod()
-	s.recursiveRLock()
-	s.deepLock()
+	s.recursiveRLock() // want "Mutex lock is adquired on this line"
+	s.deepLock()       // want "Mutex lock is adquired on this line"
 }
 
 func (s *some) ShouldNotDetectDeadLock() {

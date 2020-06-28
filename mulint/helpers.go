@@ -1,6 +1,8 @@
 package mulint
 
-import "go/ast"
+import (
+	"go/ast"
+)
 
 func CallExpr(node ast.Node) *ast.CallExpr {
 	switch sty := node.(type) {
@@ -39,7 +41,6 @@ func SubjectForCall(node ast.Node, names []string) ast.Expr {
 		}
 
 		selector := SelectorExpr(exp)
-
 		fnName := ""
 		if selector != nil {
 			fnName = selector.Sel.Name

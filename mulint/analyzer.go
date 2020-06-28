@@ -5,19 +5,45 @@ import (
 	"go/token"
 
 	"github.com/securego/gosec"
-	"golang.org/x/tools/go/loader"
+	"golang.org/x/tools/go/analysis"
 )
+
+var Mulint = &analysis.Analyzer{
+	Name: "mulint",
+	Doc:  "reports reentrant mutex locks",
+	Run:  run,
+}
+
+func run(pass *analysis.Pass) (interface{}, error) {
+	v := NewVisitor(nil, pass.Pkg, pass.TypesInfo)
+	for _, file := range pass.Files {
+		ast.Inspect(file, func(n ast.Node) bool {
+			v.Visit(n)
+
+			return true
+		})
+	}
+
+	a := NewAnalyzer(pass, v.Scopes(), v.Calls())
+	a.Analyze()
+
+	for _, e := range a.Errors() {
+		e.Report(pass)
+	}
+
+	return nil, nil
+}
 
 type Analyzer struct {
 	errors []LintError
-	pkg    *loader.PackageInfo
+	pass   *analysis.Pass
 	scopes map[FQN]*Scopes
 	calls  map[FQN][]FQN
 }
 
-func NewAnalyzer(pkg *loader.PackageInfo, scopes map[FQN]*Scopes, calls map[FQN][]FQN) *Analyzer {
+func NewAnalyzer(pass *analysis.Pass, scopes map[FQN]*Scopes, calls map[FQN][]FQN) *Analyzer {
 	return &Analyzer{
-		pkg:    pkg,
+		pass:   pass,
 		scopes: scopes,
 		calls:  calls,
 	}
@@ -49,10 +75,9 @@ func (a *Analyzer) ContainsLock(n ast.Node, seq *MutexScope) {
 
 func (a *Analyzer) checkCallToFuncWhichLocksSameMutex(seq *MutexScope, callExpr *ast.CallExpr) {
 	ctx := &gosec.Context{
-		Pkg:  a.pkg.Pkg,
-		Info: &a.pkg.Info,
+		Pkg:  a.pass.Pkg,
+		Info: a.pass.TypesInfo,
 	}
-
 	pkg, name, err := gosec.GetCallInfo(callExpr, ctx)
 
 	if err == nil {
@@ -66,6 +91,7 @@ func (a *Analyzer) checkCallToFuncWhichLocksSameMutex(seq *MutexScope, callExpr 
 
 func (a *Analyzer) hasAnyMutexScopeWithSameSelector(fqn FQN, seq *MutexScope) bool {
 	mutexScopes, ok := a.scopes[fqn]
+
 	if !ok {
 		return false
 	}

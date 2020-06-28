@@ -10,5 +10,5 @@ jobs:
     - uses: actions/setup-go@v2
       with:
         version: "^1.14.1"
-    - run: ./ui_test.sh
+    - run: go test ./...
       name: Run UI tests
