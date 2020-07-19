@@ -31,11 +31,11 @@ Note that this lint uses `golang.org/x/tools`, so all the usual wildcards to fil
 On the following lines, you can see an example of output of this lint:
 
 ```
-mixed_locks.go:[27] Mutex lock is adquired on this line: m.Test()
-	mixed_locks.go:[24] But the same lock was acquired here: m.m.Lock()
+mixed_locks.go:27: Mutex lock is acquired on this line: m.Test()
+	mixed_locks.go:24: But the same lock was acquired here: m.m.Lock()
 ```
 
-The first line indicates where the recursive lock is adquired (so, the second `Lock` on the same goroutine), the file and line where it occurs. The second one, indicate where the first `Lock` occurs
+The first line indicates where the recursive lock is acquired (so, the second `Lock` on the same goroutine), the file and line where it occurs. The second one, indicate where the first `Lock` occurs
 
 ## Exit code
 
@@ -82,7 +82,7 @@ func B(m *sync.RWMutex) {
 }
 ```
 
-There is no techincal limitation (as far as I am aware) to track when a mutex is moved, but I left this cases for now. Feel free to do the change and open a PR to include this case.
+There is no technical limitation (as far as I am aware) to track when a mutex is moved, but I left this cases for now. Feel free to do the change and open a PR to include this case.
 
 Finally, all the analysis is done per package. If there's some recursive `RLock` which operates among distinct packages, it won't be detected by this lint.
 
