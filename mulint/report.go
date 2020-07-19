@@ -36,7 +36,7 @@ func (le LintError) Report(pass *analysis.Pass) {
 	originLine := le.GetLine(pass, originLockPosition)
 
 	pass.Reportf(le.secondLock.Pos(),
-		"Mutex lock is acquired on this line: %s\n\t%s:[%d] But the same lock was acquired here: %s\n",
+		"Mutex lock is acquired on this line: %s\n\t%s:%d: But the same lock was acquired here: %s\n",
 		strings.TrimSpace(secondLockLine),
 		le.baseFilename(originLockPosition.Filename),
 		originLockPosition.Line,
