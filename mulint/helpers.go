@@ -70,7 +70,7 @@ func RootSelector(sel *ast.SelectorExpr) *ast.Ident {
 
 func SelectorExpr(call *ast.CallExpr) *ast.SelectorExpr {
 	switch exp := call.Fun.(type) {
-	case (*ast.SelectorExpr):
+	case *ast.SelectorExpr:
 		return exp
 	default:
 	}

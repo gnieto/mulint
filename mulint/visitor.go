@@ -49,7 +49,6 @@ type Scopes struct {
 	defers   map[string]bool
 	finished []*MutexScope
 	prog     *loader.Program
-	pkg      *loader.PackageInfo
 }
 
 func NewScopes(prog *loader.Program) *Scopes {
@@ -96,7 +95,7 @@ func (s *Scopes) Track(stmt ast.Stmt) {
 }
 
 func (s *Scopes) EndBlock() {
-	for k, _ := range s.defers {
+	for k := range s.defers {
 		if og, ok := s.onGoing[k]; ok {
 			s.finished = append(s.finished, og)
 		}
@@ -126,9 +125,9 @@ func (s *Scopes) isDeferUnlockCall(node ast.Node) ast.Expr {
 	switch sty := node.(type) {
 	case *ast.DeferStmt:
 		return s.isUnlockCall(sty.Call)
+	default:
+		return nil
 	}
-
-	return nil
 }
 
 type Visitor struct {
@@ -186,7 +185,7 @@ func (v *Visitor) recordCalls(currentFQN FQN, body *ast.BlockStmt) {
 	}
 }
 
-func (v *Visitor) addCall(from FQN, to FQN) {
+func (v *Visitor) addCall(from, to FQN) {
 	_, ok := v.calls[from]
 	if !ok {
 		v.calls[from] = make([]FQN, 0)
