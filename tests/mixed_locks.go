@@ -24,10 +24,10 @@ func (m *mixed) TestFail() {
 	m.m.Lock()
 	defer m.m.Unlock()
 
-	m.Test() // want "Mutex lock is adquired on this line"
+	m.Test() // want "Mutex lock is acquired on this line"
 }
 
-func (m *mixed) Interlevead() {
+func (m *mixed) Interleaved() {
 	m.m.Lock()
 	m.m2.Lock()
 	m.m.Unlock()
