@@ -83,7 +83,7 @@ func (a *Analyzer) checkCallToFuncWhichLocksSameMutex(seq *MutexScope, callExpr 
 	if err == nil {
 		fqn := FromCallInfo(pkg, name)
 
-		if a.hasTransitiveCall(fqn, seq, make(map[FQN]bool)) == true {
+		if a.hasTransitiveCall(fqn, seq, make(map[FQN]bool)) {
 			a.recordError(seq.Pos(), callExpr.Pos())
 		}
 	}
@@ -97,7 +97,7 @@ func (a *Analyzer) hasAnyMutexScopeWithSameSelector(fqn FQN, seq *MutexScope) bo
 	}
 
 	for _, currentMutexScope := range mutexScopes.Scopes() {
-		if currentMutexScope.IsEqual(seq) == true {
+		if currentMutexScope.IsEqual(seq) {
 			return true
 		}
 	}
@@ -137,7 +137,7 @@ func (a *Analyzer) checkLockToSequenceMutex(seq *MutexScope, callExpr *ast.CallE
 	}
 }
 
-func (a *Analyzer) recordError(origin token.Pos, secondLock token.Pos) {
+func (a *Analyzer) recordError(origin, secondLock token.Pos) {
 	originLoc := NewLocation(origin)
 	secondLockLoc := NewLocation(secondLock)
 
